@@ -46,6 +46,12 @@ export function FormField({ fieldKey }: Props) {
     }
   }
 
+  function handleLongPress() {
+    if (field.status === "inferred") {
+      setEditing(true);
+    }
+  }
+
   const backgroundColor =
     field.status === "confirmed"
       ? theme.colors.fieldConfirmed
@@ -74,6 +80,7 @@ export function FormField({ fieldKey }: Props) {
     >
       <Pressable
         onPress={handlePress}
+        onLongPress={handleLongPress}
         unstable_pressDelay={50}
         style={{
           backgroundColor,
