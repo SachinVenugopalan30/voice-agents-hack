@@ -17,22 +17,56 @@ export class ExtractionEngine {
 
   constructor() {}
 
+  private async initModelFromPath(modelPath: string): Promise<void> {
+    console.log("[ExtractionEngine] Creating CactusLM instance...");
+    this.lm = new CactusLM({
+      model: modelPath,
+    });
+
+    console.log("[ExtractionEngine] Initializing Gemma 4 model...");
+    await this.lm.init();
+  }
+
   /**
    * Downloads and initializes the Gemma 4 E2B model.
    * We bypass the CactusLM.download() registry lookup and use CactusFileSystem directly.
    */
   async loadModels(onProgress?: (progress: number) => void): Promise<void> {
-    if (this.lm || this.isModelLoading) return;
+    console.log(
+      `[ExtractionEngine] loadModels called. hasLm=${Boolean(this.lm)} isModelLoading=${this.isModelLoading}`
+    );
+    if (this.lm || this.isModelLoading) {
+      console.log("[ExtractionEngine] Skipping loadModels because model is already ready/loading");
+      return;
+    }
     
     this.isModelLoading = true;
     try {
-      // Step 1: Check if model is already downloaded
-      const alreadyExists = await CactusFileSystem.modelExists(GEMMA4_MODEL_NAME);
-      
-      if (alreadyExists) {
-        console.log("[ExtractionEngine] Gemma 4 E2B already downloaded.");
+      let modelPath: string | null = null;
+
+      try {
+        console.log("[ExtractionEngine] Attempting to reuse local Gemma 4 model path...");
+        modelPath = await CactusFileSystem.getModelPath(GEMMA4_MODEL_NAME);
+        console.log("[ExtractionEngine] Reusing local Gemma 4 model path:", modelPath);
+        await this.initModelFromPath(modelPath);
         if (onProgress) onProgress(100);
-      } else {
+        console.log("[ExtractionEngine] Gemma 4 E2B loaded successfully from local cache.");
+        return;
+      } catch (reuseError) {
+        console.warn(
+          "[ExtractionEngine] Local Gemma 4 reuse failed, falling back to download:",
+          reuseError
+        );
+        if (this.lm) {
+          await this.lm.destroy().catch(() => undefined);
+          this.lm = null;
+        }
+      }
+
+      console.log("[ExtractionEngine] Checking whether Gemma 4 model already exists...");
+      const alreadyExists = await CactusFileSystem.modelExists(GEMMA4_MODEL_NAME);
+
+      if (!alreadyExists) {
         console.log("[ExtractionEngine] Downloading Gemma 4 E2B from HuggingFace...");
         await CactusFileSystem.downloadModel(
           GEMMA4_MODEL_NAME, 
@@ -42,18 +76,15 @@ export class ExtractionEngine {
           }
         );
         console.log("[ExtractionEngine] Download complete.");
+      } else {
+        console.log("[ExtractionEngine] modelExists() reports Gemma 4 is already present.");
       }
 
-      // Step 2: Get the local path and create a CactusLM pointing to it
-      const modelPath = await CactusFileSystem.getModelPath(GEMMA4_MODEL_NAME);
+      console.log("[ExtractionEngine] Resolving local Gemma 4 model path...");
+      modelPath = await CactusFileSystem.getModelPath(GEMMA4_MODEL_NAME);
       console.log("[ExtractionEngine] Model path:", modelPath);
 
-      // Use file path directly — this skips the registry lookup entirely
-      this.lm = new CactusLM({
-        model: modelPath,
-      });
-      
-      await this.lm.init();
+      await this.initModelFromPath(modelPath);
       
       console.log("[ExtractionEngine] Gemma 4 E2B loaded successfully.");
     } catch (error) {
@@ -119,7 +150,7 @@ export class ExtractionEngine {
    */
   async extractFromImage(
     imagePath: string,
-    currentFields: IntakeSchema
+    _currentFields: IntakeSchema
   ): Promise<Partial<Record<keyof IntakeSchema, any>> | null> {
     if (!this.lm) return null;
 

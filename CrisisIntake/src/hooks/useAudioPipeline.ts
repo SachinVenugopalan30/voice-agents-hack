@@ -53,6 +53,18 @@ export function useAudioPipeline() {
   const recorder = useRef<AudioRecorder | null>(null);
   const processingRef = useRef(false);
 
+  const resetDetectionState = useCallback(() => {
+    ringBuffer.current = [];
+    captureSampleRateRef.current = TARGET_SAMPLE_RATE;
+    processingRef.current = false;
+    speechActiveRef.current = false;
+    speechCandidateChunksRef.current = 0;
+    silenceResetCandidateChunksRef.current = 0;
+    recorderPausedRef.current = false;
+    currentRecordingPathRef.current = null;
+    useAppStore.getState().resetAudioCounters();
+  }, []);
+
   const stopCapture = useCallback((nextPhase: "idle" | "reviewing" = "idle") => {
     const currentRecorder = recorder.current;
     if (currentRecorder) {
@@ -66,22 +78,15 @@ export function useAudioPipeline() {
       }
     }
 
-    ringBuffer.current = [];
-    processingRef.current = false;
     isListeningRef.current = false;
-    speechActiveRef.current = false;
-    speechCandidateChunksRef.current = 0;
-    silenceResetCandidateChunksRef.current = 0;
-    recorderPausedRef.current = false;
-    currentRecordingPathRef.current = null;
     setIsListening(false);
-    useAppStore.getState().resetAudioCounters();
+    resetDetectionState();
     useAppStore.getState().setPipelinePhase(nextPhase);
 
     AudioManager.setAudioSessionActivity(false).catch((error) => {
       console.warn("[AudioPipeline] Failed to deactivate audio session:", error);
     });
-  }, []);
+  }, [resetDetectionState]);
 
   const startRecorderCapture = useCallback(() => {
     const currentRecorder = recorder.current;
@@ -220,25 +225,17 @@ export function useAudioPipeline() {
         stopCapture("reviewing");
       } else {
         console.warn("[AudioPipeline] STT returned empty/failed result");
-        ringBuffer.current = [];
-        useAppStore.getState().resetAudioCounters();
-        speechActiveRef.current = false;
-        speechCandidateChunksRef.current = 0;
-        silenceResetCandidateChunksRef.current = 0;
+        resetDetectionState();
         startRecorderCapture();
       }
     } catch (error) {
       console.error("[AudioPipeline] STT failed:", error);
-      ringBuffer.current = [];
-      useAppStore.getState().resetAudioCounters();
-      speechActiveRef.current = false;
-      speechCandidateChunksRef.current = 0;
-      silenceResetCandidateChunksRef.current = 0;
+      resetDetectionState();
       startRecorderCapture();
     } finally {
       processingRef.current = false;
     }
-  }, [startRecorderCapture, stopCapture]);
+  }, [resetDetectionState, startRecorderCapture, stopCapture]);
 
   const setupAudioProcess = useCallback(() => {
     if (!recorder.current) {
@@ -415,15 +412,8 @@ export function useAudioPipeline() {
         }
       }
 
-      ringBuffer.current = [];
-      captureSampleRateRef.current = TARGET_SAMPLE_RATE;
-      processingRef.current = false;
-      speechActiveRef.current = false;
-      speechCandidateChunksRef.current = 0;
-      silenceResetCandidateChunksRef.current = 0;
-      recorderPausedRef.current = false;
-      currentRecordingPathRef.current = null;
-      useAppStore.getState().resetAudioCounters();
+      recorder.current.clearOnAudioReady();
+      resetDetectionState();
 
       setupAudioProcess();
       startRecorderCapture();
@@ -431,7 +421,7 @@ export function useAudioPipeline() {
       console.error("[AudioPipeline] Failed to start audio pipeline:", error);
       stopCapture("idle");
     }
-  }, [modelsLoaded, setupAudioProcess, startRecorderCapture, stopCapture]);
+  }, [modelsLoaded, resetDetectionState, setupAudioProcess, startRecorderCapture, stopCapture]);
 
   const stopListening = useCallback(() => {
     console.log("[AudioPipeline] stopListening called");

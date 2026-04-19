@@ -9,6 +9,9 @@ import { CactusSTT } from "cactus-react-native";
 import { IntakeSchema } from "../types/intake";
 import { getExtractionEngine } from "../services/loadExtractionEngine";
 
+const AUTO_RESUME_DELAY_MS = 350;
+let sttPreloadPromise: Promise<void> | null = null;
+
 export function IntakeSessionScreen() {
   const pipeline = useAudioPipeline();
   const modelsLoaded = useAppStore(s => s.modelsLoaded);
@@ -20,20 +23,32 @@ export function IntakeSessionScreen() {
   useEffect(() => {
     const loadModels = async () => {
       try {
-        const stt = new CactusSTT({
-          model: AUDIO_PIPELINE_STT_MODEL,
-          options: { quantization: "int8", pro: false },
-        });
+        if (!sttPreloadPromise) {
+          console.log("[Startup] Creating STT preload promise");
+          sttPreloadPromise = (async () => {
+            const stt = new CactusSTT({
+              model: AUDIO_PIPELINE_STT_MODEL,
+              options: { quantization: "int8", pro: false },
+            });
 
-        console.log("Downloading STT model...");
-        await stt.download({
-          onProgress: (p) => useAppStore.getState().updateDownloadProgress("stt", p)
-        });
+            console.log("[Startup] Downloading STT model...");
+            await stt.download({
+              onProgress: (p) => useAppStore.getState().updateDownloadProgress("stt", p)
+            });
 
-        console.log("STT model downloaded!");
+            console.log("[Startup] STT model downloaded");
+          })().catch((error) => {
+            sttPreloadPromise = null;
+            throw error;
+          });
+        } else {
+          console.log("[Startup] Reusing existing STT preload promise");
+        }
+
+        await sttPreloadPromise;
         setModelsLoaded(true);
       } catch (e) {
-        console.error("Failed to load models:", e);
+        console.error("[Startup] Failed to load STT model:", e);
       }
     };
 
@@ -43,10 +58,7 @@ export function IntakeSessionScreen() {
   }, [modelsLoaded, setModelsLoaded]);
 
   useEffect(() => {
-    if (!modelsLoaded) {
-      return;
-    }
-
+    console.log("[Startup] Requesting Gemma preload");
     getExtractionEngine((model, progress) => {
       if (model === "llm") {
         useAppStore.getState().updateDownloadProgress("llm", progress);
@@ -54,13 +66,16 @@ export function IntakeSessionScreen() {
     }).catch((error) => {
       console.warn("[IntakeSession] Extraction preload skipped:", error);
     });
-  }, [modelsLoaded]);
+  }, []);
 
   const handleTranscriptConfirmed = async (editedText: string) => {
     const rawText = currentTranscript ?? editedText;
     const wasEdited = rawText !== editedText;
     let fieldsExtracted: string[] = [];
 
+    console.log(
+      `[ExtractionPipeline] Confirmed transcript. rawLength=${rawText.length} editedLength=${editedText.length} wasEdited=${wasEdited} text="${editedText.slice(0, 160)}"`
+    );
     useAppStore.getState().clearCurrentTranscript();
     useAppStore.getState().setPipelinePhase("extracting");
 
@@ -72,13 +87,18 @@ export function IntakeSessionScreen() {
       });
 
       if (!engine) {
+        console.warn("[ExtractionPipeline] Extraction engine unavailable");
         console.warn("[IntakeSession] Extraction engine unavailable; skipping merge");
       } else {
+        console.log(
+          `[ExtractionPipeline] Engine ready=${engine.isReady?.() ?? "unknown"}. Starting extractFromTranscript()`
+        );
         const delta = await engine.extractFromTranscript(
           editedText,
           intake as IntakeSchema
         );
 
+        console.log("[ExtractionPipeline] Raw extraction delta:", delta);
         if (delta) {
           const filteredDelta = Object.fromEntries(
             Object.entries(delta).filter(([key, value]) => {
@@ -92,22 +112,34 @@ export function IntakeSessionScreen() {
           ) as Partial<Record<keyof IntakeSchema, unknown>>;
 
           const extractedFieldKeys = Object.keys(filteredDelta) as Array<keyof IntakeSchema>;
+          console.log(
+            `[ExtractionPipeline] Filtered extraction fields: ${extractedFieldKeys.join(", ") || "none"}`
+          );
 
           if (extractedFieldKeys.length > 0) {
+            console.log("[ExtractionPipeline] Applying merged voice fields:", filteredDelta);
             useAppStore
               .getState()
               .mergeFields(
                 filteredDelta as Partial<Record<keyof IntakeSchema, any>>,
                 "voice"
               );
+          } else {
+            console.log("[ExtractionPipeline] No valid fields to merge");
           }
 
           fieldsExtracted = extractedFieldKeys.map((field) => field as string);
+        } else {
+          console.log("[ExtractionPipeline] Extraction returned null delta");
         }
       }
     } catch (error) {
+      console.error("[ExtractionPipeline] Extraction failed:", error);
       console.error("[IntakeSession] Transcript extraction failed:", error);
     } finally {
+      console.log(
+        `[ExtractionPipeline] Extraction complete. fieldsExtracted=${fieldsExtracted.join(", ") || "none"}`
+      );
       useAppStore.getState().commitTranscript({
         id: `${Date.now()}`,
         rawText,
@@ -117,7 +149,10 @@ export function IntakeSessionScreen() {
         fieldsExtracted,
       });
       useAppStore.getState().setPipelinePhase("idle");
+      await new Promise((resolve) => setTimeout(resolve, AUTO_RESUME_DELAY_MS));
+      console.log("[ExtractionPipeline] Restarting listening after extraction");
       pipeline.startListening().catch((error) => {
+        console.warn("[ExtractionPipeline] Auto-resume failed:", error);
         console.warn("[IntakeSession] Failed to resume listening:", error);
       });
     }
