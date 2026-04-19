@@ -16,6 +16,12 @@ import { theme } from "../theme";
 import { CactusSTT } from "cactus-react-native";
 import { IntakeSchema, FIELD_METADATA } from "../types/intake";
 import { getExtractionEngine } from "../services/loadExtractionEngine";
+import { sanitizeIntake } from "../services/sanitization";
+import {
+  clearQueuedSanitizedPayload,
+  enqueueSanitizedPayload,
+  generateResourcePlan,
+} from "../services/gemini";
 
 let sttPreloadPromise: Promise<void> | null = null;
 
@@ -26,6 +32,9 @@ export function IntakeSessionScreen() {
   const pipeline = useAudioPipeline();
   const modelsLoaded = useAppStore(s => s.modelsLoaded);
   const setModelsLoaded = useAppStore(s => s.setModelsLoaded);
+  const cloudStatus = useAppStore((s) => s.cloudStatus);
+  const setCloudStatus = useAppStore((s) => s.setCloudStatus);
+  const setCloudResult = useAppStore((s) => s.setCloudResult);
 
   // Register transcript callback — runs extraction silently, no popup
   useEffect(() => {
@@ -120,11 +129,49 @@ export function IntakeSessionScreen() {
     });
   }, []);
 
+  const handleGeneratePlan = async () => {
+    if (cloudStatus === "sanitizing" || cloudStatus === "sending") {
+      return;
+    }
+
+    const sanitized = sanitizeIntake(useAppStore.getState().intake);
+    setCloudResult(null);
+    setCloudStatus("sanitizing");
+    navigation.navigate("ResourcePlan");
+
+    try {
+      setCloudStatus("sending");
+      const result = await generateResourcePlan(sanitized);
+      await clearQueuedSanitizedPayload();
+      setCloudResult(result);
+      setCloudStatus("complete");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isTransientNetworkError =
+        /network request failed|failed to fetch|load failed|timed out/i.test(message);
+
+      if (isTransientNetworkError) {
+        await enqueueSanitizedPayload(sanitized);
+        setCloudStatus("queued");
+        return;
+      }
+
+      console.error("[IntakeSession] Plan generation failed:", error);
+      setCloudStatus("error");
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <Text style={theme.typography.h2}>Crisis Intake</Text>
         <View style={styles.headerRight}>
+          <Pressable
+            style={styles.scanButton}
+            onPress={() => navigation.navigate("DocumentScan")}
+          >
+            <Text style={styles.scanButtonText}>Scan Docs</Text>
+          </Pressable>
           <RecordingIndicator />
           <Pressable
             style={[
@@ -147,7 +194,7 @@ export function IntakeSessionScreen() {
       ) : (
         <View style={styles.body}>
           <IntakeForm />
-          <CompletionBar onGeneratePlan={() => navigation.navigate("ResourcePlan")} />
+          <CompletionBar onGeneratePlan={handleGeneratePlan} />
         </View>
       )}
     </SafeAreaView>
@@ -177,6 +224,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.sm,
+  },
+  scanButton: {
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radii.md,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.fieldEmptyBorder,
+  },
+  scanButtonText: {
+    ...theme.typography.caption,
+    color: theme.colors.textPrimary,
+    fontWeight: "600",
   },
   micButton: {
     paddingVertical: theme.spacing.xs,

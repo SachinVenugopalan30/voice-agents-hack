@@ -35,7 +35,9 @@ export function FormField({ fieldKey }: Props) {
   }, [field.status]);
 
   function handlePress() {
-    if (field.status === "inferred") {
+    if (field.status === "empty") {
+      setEditing(true);
+    } else if (field.status === "inferred") {
       confirmField(fieldKey);
       setEditing(false);
     } else if (field.status === "confirmed") {
@@ -106,7 +108,33 @@ export function FormField({ fieldKey }: Props) {
           )}
         </View>
 
-        {editing && field.status === "inferred" && (
+        {!editing && (
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation();
+              if (field.status === "confirmed") {
+                unlockField(fieldKey);
+              }
+              setEditing(true);
+            }}
+            style={{
+              marginTop: theme.spacing.sm,
+              alignSelf: "flex-start",
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.radii.sm,
+              paddingVertical: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.sm,
+              borderWidth: 1,
+              borderColor: borderColor,
+            }}
+          >
+            <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary }}>
+              {field.status === "empty" ? "Enter manually" : "Edit manually"}
+            </Text>
+          </Pressable>
+        )}
+
+        {editing && (
           <FieldEditor
             fieldKey={fieldKey}
             currentValue={field.value}
