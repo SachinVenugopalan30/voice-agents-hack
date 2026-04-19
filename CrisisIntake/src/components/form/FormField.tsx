@@ -35,11 +35,19 @@ export function FormField({ fieldKey }: Props) {
   }, [field.status]);
 
   function handlePress() {
-    if (field.status === "inferred") {
+    if (field.status === "empty") {
+      setEditing(true);
+    } else if (field.status === "inferred") {
       confirmField(fieldKey);
       setEditing(false);
     } else if (field.status === "confirmed") {
       unlockField(fieldKey);
+      setEditing(true);
+    }
+  }
+
+  function handleLongPress() {
+    if (field.status === "inferred") {
       setEditing(true);
     }
   }
@@ -72,6 +80,7 @@ export function FormField({ fieldKey }: Props) {
     >
       <Pressable
         onPress={handlePress}
+        onLongPress={handleLongPress}
         unstable_pressDelay={50}
         style={{
           backgroundColor,
@@ -106,7 +115,7 @@ export function FormField({ fieldKey }: Props) {
           )}
         </View>
 
-        {editing && field.status === "inferred" && (
+        {editing && (
           <FieldEditor
             fieldKey={fieldKey}
             currentValue={field.value}
