@@ -66,7 +66,7 @@ interface AppState {
 
   // Actions — Cloud
   setCloudStatus: (status: CloudStatus) => void;
-  setCloudResult: (result: CloudAnalysis) => void;
+  setCloudResult: (result: CloudAnalysis | null) => void;
 
   // Computed
   getCompletionPercentage: () => number;

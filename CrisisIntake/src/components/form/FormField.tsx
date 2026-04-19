@@ -115,6 +115,32 @@ export function FormField({ fieldKey }: Props) {
           )}
         </View>
 
+        {!editing && (
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation();
+              if (field.status === "confirmed") {
+                unlockField(fieldKey);
+              }
+              setEditing(true);
+            }}
+            style={{
+              marginTop: theme.spacing.sm,
+              alignSelf: "flex-start",
+              backgroundColor: theme.colors.surface,
+              borderRadius: theme.radii.sm,
+              paddingVertical: theme.spacing.xs,
+              paddingHorizontal: theme.spacing.sm,
+              borderWidth: 1,
+              borderColor: borderColor,
+            }}
+          >
+            <Text style={{ ...theme.typography.caption, color: theme.colors.textSecondary }}>
+              {field.status === "empty" ? "Enter manually" : "Edit manually"}
+            </Text>
+          </Pressable>
+        )}
+
         {editing && (
           <FieldEditor
             fieldKey={fieldKey}

@@ -12,10 +12,12 @@ interface Props {
 export function CompletionBar({ onGeneratePlan }: Props) {
   const insets = useSafeAreaInsets();
   const intake = useAppStore((s) => s.intake);
+  const cloudStatus = useAppStore((s) => s.cloudStatus);
 
   const nonEmpty = FIELD_METADATA.filter((m) => intake[m.key].status !== "empty").length;
   const pct = Math.round((nonEmpty / FIELD_METADATA.length) * 100);
-  const canGenerate = pct >= 60;
+  const isGenerating = cloudStatus === "sanitizing" || cloudStatus === "sending";
+  const canGenerate = pct >= 70 && !isGenerating;
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -76,7 +78,7 @@ export function CompletionBar({ onGeneratePlan }: Props) {
           }}
         >
           <Text style={{ ...theme.typography.caption, color: theme.colors.background }}>
-            Generate Plan
+            {isGenerating ? "Generating..." : "Generate Plan"}
           </Text>
         </Pressable>
       </View>
