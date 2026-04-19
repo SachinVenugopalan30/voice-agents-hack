@@ -17,7 +17,7 @@ export function ConfirmBar({ onGeneratePlan }: Props) {
     (m) => intake[m.key].status === "inferred"
   ).length;
 
-  const canGeneratePlan = percentage >= 30;
+  const canGeneratePlan = percentage >= 70;
 
   if (inferredCount === 0 && !canGeneratePlan) return null;
 
