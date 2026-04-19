@@ -1,131 +1,199 @@
-import React, { useState } from "react";
-import { View, Text, SafeAreaView, TextInput, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
-import { theme } from "../theme";
-import { extractionEngine } from "../services/extraction";
+import React, { useEffect } from "react";
+import { View, Text, SafeAreaView, TouchableOpacity, StyleSheet } from "react-native";
 import { useAppStore } from "../store/useAppStore";
+import { AUDIO_PIPELINE_STT_MODEL, useAudioPipeline } from "../hooks/useAudioPipeline";
+import { RecordingIndicator } from "../components/audio/RecordingIndicator";
+import { TranscriptReviewSheet } from "../components/audio/TranscriptReviewSheet";
+import { theme } from "../theme";
+import { CactusSTT } from "cactus-react-native";
+import { IntakeSchema } from "../types/intake";
+import { getExtractionEngine } from "../services/loadExtractionEngine";
 
 export function IntakeSessionScreen() {
-  const [testTranscript, setTestTranscript] = useState("My name is Bob, I am 45 years old, and I have lived in an apartment for 2 months.");
-  const [loading, setLoading] = useState(false);
-  const [extracting, setExtracting] = useState(false);
-  const [lastDelta, setLastDelta] = useState<any>(null);
-
-  const intake = useAppStore(s => s.intake);
+  const pipeline = useAudioPipeline();
   const modelsLoaded = useAppStore(s => s.modelsLoaded);
   const setModelsLoaded = useAppStore(s => s.setModelsLoaded);
-  const mergeFields = useAppStore(s => s.mergeFields);
+  const currentTranscript = useAppStore(s => s.currentTranscript);
+  const intake = useAppStore(s => s.intake);
+  
+  // Download STT model on mount (VAD is energy-based, no model needed)
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const stt = new CactusSTT({
+          model: AUDIO_PIPELINE_STT_MODEL,
+          options: { quantization: "int8", pro: false },
+        });
 
-  const handleLoadModel = async () => {
-    setLoading(true);
-    try {
-      await extractionEngine.loadModels();
-      setModelsLoaded(true);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+        console.log("Downloading STT model...");
+        await stt.download({
+          onProgress: (p) => useAppStore.getState().updateDownloadProgress("stt", p)
+        });
 
-  const handleTestExtraction = async () => {
-    console.log("[UI] 'Run Extraction' button pressed!");
-    setExtracting(true);
-    try {
-      const delta = await extractionEngine.extractFromTranscript(testTranscript, intake);
-      console.log("[UI] Extraction complete, delta received:", delta);
-      if (delta) {
-        setLastDelta(delta);
-        mergeFields(delta, "voice");
-      } else {
-        console.warn("[UI] No delta received or extraction returned null.");
+        console.log("STT model downloaded!");
+        setModelsLoaded(true);
+      } catch (e) {
+        console.error("Failed to load models:", e);
       }
-    } catch (e) {
-      console.error("[UI] Error during handleTestExtraction:", e);
+    };
+
+    if (!modelsLoaded) {
+      loadModels();
+    }
+  }, [modelsLoaded, setModelsLoaded]);
+
+  useEffect(() => {
+    if (!modelsLoaded) {
+      return;
+    }
+
+    getExtractionEngine((model, progress) => {
+      if (model === "llm") {
+        useAppStore.getState().updateDownloadProgress("llm", progress);
+      }
+    }).catch((error) => {
+      console.warn("[IntakeSession] Extraction preload skipped:", error);
+    });
+  }, [modelsLoaded]);
+
+  const handleTranscriptConfirmed = async (editedText: string) => {
+    const rawText = currentTranscript ?? editedText;
+    const wasEdited = rawText !== editedText;
+    let fieldsExtracted: string[] = [];
+
+    useAppStore.getState().clearCurrentTranscript();
+    useAppStore.getState().setPipelinePhase("extracting");
+
+    try {
+      const engine = await getExtractionEngine((model, progress) => {
+        if (model === "llm") {
+          useAppStore.getState().updateDownloadProgress("llm", progress);
+        }
+      });
+
+      if (!engine) {
+        console.warn("[IntakeSession] Extraction engine unavailable; skipping merge");
+      } else {
+        const delta = await engine.extractFromTranscript(
+          editedText,
+          intake as IntakeSchema
+        );
+
+        if (delta) {
+          const filteredDelta = Object.fromEntries(
+            Object.entries(delta).filter(([key, value]) => {
+              return Boolean(
+                intake[key as keyof IntakeSchema] &&
+                  value !== null &&
+                  value !== undefined &&
+                  value !== ""
+              );
+            })
+          ) as Partial<Record<keyof IntakeSchema, unknown>>;
+
+          const extractedFieldKeys = Object.keys(filteredDelta) as Array<keyof IntakeSchema>;
+
+          if (extractedFieldKeys.length > 0) {
+            useAppStore
+              .getState()
+              .mergeFields(
+                filteredDelta as Partial<Record<keyof IntakeSchema, any>>,
+                "voice"
+              );
+          }
+
+          fieldsExtracted = extractedFieldKeys.map((field) => field as string);
+        }
+      }
+    } catch (error) {
+      console.error("[IntakeSession] Transcript extraction failed:", error);
     } finally {
-      setExtracting(false);
+      useAppStore.getState().commitTranscript({
+        id: `${Date.now()}`,
+        rawText,
+        editedText,
+        wasEdited,
+        timestamp: Date.now(),
+        fieldsExtracted,
+      });
+      useAppStore.getState().setPipelinePhase("idle");
+      pipeline.startListening().catch((error) => {
+        console.warn("[IntakeSession] Failed to resume listening:", error);
+      });
     }
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <ScrollView contentContainerStyle={{ padding: theme.spacing.lg }}>
-        <Text style={theme.typography.h1}>Intake Session</Text>
-        
-        {/* Verification / Test Dashboard */}
-        <View style={{ 
-          marginTop: theme.spacing.xl, 
-          padding: theme.spacing.md, 
-          backgroundColor: theme.colors.surface, 
-          borderRadius: theme.radii.lg,
-          borderWidth: 1,
-          borderColor: theme.colors.fieldEmptyBorder
-        }}>
-          <Text style={theme.typography.sectionHeader}>Extraction Debug Tool</Text>
-          
-          <View style={{ marginTop: theme.spacing.md }}>
-            <Text style={theme.typography.caption}>Status: {modelsLoaded ? "🟢 Model Ready" : "🔴 Model Not Loaded"}</Text>
-            
-            {!modelsLoaded && (
-              <TouchableOpacity 
-                onPress={handleLoadModel}
-                disabled={loading}
-                style={{ 
-                  backgroundColor: theme.colors.accent, 
-                  padding: theme.spacing.md, 
-                  borderRadius: theme.radii.md,
-                  marginTop: theme.spacing.sm,
-                  alignItems: 'center'
-                }}
-              >
-                {loading ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontWeight: '600' }}>Load Gemma 4 Engine</Text>}
-              </TouchableOpacity>
-            )}
-          </View>
+      <View style={styles.header}>
+        <Text style={theme.typography.h2}>Crisis Intake</Text>
+        <RecordingIndicator />
+      </View>
 
-          <View style={{ marginTop: theme.spacing.lg }}>
-            <Text style={theme.typography.body}>Sample Transcript:</Text>
-            <TextInput
-              multiline
-              value={testTranscript}
-              onChangeText={setTestTranscript}
-              style={{
-                backgroundColor: theme.colors.background,
-                padding: theme.spacing.md,
-                borderRadius: theme.radii.md,
-                marginTop: theme.spacing.sm,
-                borderWidth: 1,
-                borderColor: theme.colors.fieldEmptyBorder,
-                minHeight: 80
-              }}
-            />
+      <View style={styles.content}>
+        {!modelsLoaded ? (
+          <>
+            <Text style={theme.typography.body}>Downloading STT Model...</Text>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity 
+              style={[
+                styles.button, 
+                { backgroundColor: pipeline.isListening ? theme.colors.danger : theme.colors.accent }
+              ]}
+              onPress={() => pipeline.isListening ? pipeline.stopListening() : pipeline.startListening()}
+            >
+              <Text style={styles.buttonText}>
+                {pipeline.isListening ? "Stop Listening" : "Start Listening"}
+              </Text>
+            </TouchableOpacity>
+            
+            <View style={styles.stats}>
+              <Text style={theme.typography.caption}>Speech: {pipeline.speechSeconds.toFixed(1)}s</Text>
+              <Text style={theme.typography.caption}>Silence: {pipeline.silenceSeconds.toFixed(1)}s</Text>
+            </View>
 
             <TouchableOpacity 
-              onPress={handleTestExtraction}
-              disabled={!modelsLoaded || extracting}
-              style={{ 
-                backgroundColor: modelsLoaded ? theme.colors.fieldInferredAccent : theme.colors.textMuted, 
-                padding: theme.spacing.md, 
-                borderRadius: theme.radii.md,
-                marginTop: theme.spacing.md,
-                alignItems: 'center'
-              }}
+              style={[styles.button, { marginTop: theme.spacing.xl, backgroundColor: theme.colors.textMuted }]}
+              onPress={() => useAppStore.getState().setCurrentTranscript("This is a test transcript to verify the review sheet UI.")}
             >
-              {extracting ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontWeight: '600' }}>Run Extraction</Text>}
+              <Text style={styles.buttonText}>Test Transcript UI</Text>
             </TouchableOpacity>
-          </View>
+          </>
+        )}
+      </View>
 
-          {lastDelta && (
-            <View style={{ marginTop: theme.spacing.lg, padding: theme.spacing.sm, backgroundColor: '#f1f1f1', borderRadius: theme.radii.sm }}>
-              <Text style={theme.typography.caption}>Last Delta Extracted:</Text>
-              <Text style={{ fontSize: 10, fontFamily: 'Courier' }}>{JSON.stringify(lastDelta, null, 2)}</Text>
-            </View>
-          )}
-        </View>
-
-        <Text style={{ ...theme.typography.caption, marginTop: theme.spacing.xxl, textAlign: 'center' }}>
-          Form Preview: {Object.values(intake).filter(f => f.status !== 'empty').length} fields extracted
-        </Text>
-      </ScrollView>
+      <TranscriptReviewSheet onConfirm={handleTranscriptConfirmed} />
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    padding: theme.spacing.lg,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  content: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: theme.spacing.xl,
+  },
+  button: {
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.radii.lg,
+    ...theme.shadows.card,
+  },
+  buttonText: {
+    ...theme.typography.h3,
+    color: "#FFFFFF",
+  },
+  stats: {
+    marginTop: theme.spacing.lg,
+    alignItems: 'center',
+  }
+});
