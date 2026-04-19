@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>CrisisIntake</string>
+	<string>Oasis</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -36,9 +36,9 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>NSCameraUsageDescription</key>
-	<string>Crisis Intake uses the camera to scan documents during intake.</string>
+	<string>Oasis uses the camera to scan documents during intake.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Crisis Intake uses the microphone to capture conversations for on-device transcription.</string>
+	<string>Oasis uses the microphone to capture conversations for on-device transcription.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

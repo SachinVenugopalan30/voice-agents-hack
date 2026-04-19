@@ -10,6 +10,8 @@ import {
   useAudioPipeline,
 } from "../hooks/useAudioPipeline";
 import { RecordingIndicator } from "../components/audio/RecordingIndicator";
+import { StatusStrip } from "../components/audio/StatusStrip";
+import { TranscriptTicker } from "../components/audio/TranscriptTicker";
 import { IntakeForm } from "../components/form/IntakeForm";
 import { CompletionBar } from "../components/form/CompletionBar";
 import { theme } from "../theme";
@@ -164,58 +166,85 @@ export function IntakeSessionScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <Text style={theme.typography.h2}>Crisis Intake</Text>
-        <View style={styles.headerRight}>
-          <Pressable
-            style={styles.scanButton}
-            onPress={() => navigation.navigate("DocumentScan")}
-          >
-            <Text style={styles.scanButtonText}>Scan Docs</Text>
-          </Pressable>
-          <RecordingIndicator />
-          <Pressable
-            style={[
-              styles.micButton,
-              { backgroundColor: pipeline.isListening ? theme.colors.danger : theme.colors.accent },
-            ]}
-            onPress={() => pipeline.isListening ? pipeline.stopListening() : pipeline.startListening()}
-          >
-            <Text style={styles.micButtonText}>
-              {pipeline.isListening ? "Stop" : "\u{1F3A4} Listen"}
-            </Text>
-          </Pressable>
+    <View style={styles.root}>
+      <SafeAreaView style={styles.headerSafe}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.brandName}>OASIS</Text>
+            <Text style={styles.brandSub}>Voice Intake</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <Pressable
+              style={styles.scanButton}
+              onPress={() => navigation.navigate("DocumentScan")}
+            >
+              <Text style={styles.scanButtonText}>Scan</Text>
+            </Pressable>
+            <RecordingIndicator />
+            <Pressable
+              style={[
+                styles.micButton,
+                pipeline.isListening && styles.micButtonActive,
+              ]}
+              onPress={() => pipeline.isListening ? pipeline.stopListening() : pipeline.startListening()}
+            >
+              <Text style={styles.micButtonText}>
+                {pipeline.isListening ? "Stop" : "Listen"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
-      </View>
+      </SafeAreaView>
+
+      <StatusStrip />
 
       {!modelsLoaded ? (
         <View style={styles.loading}>
-          <Text style={theme.typography.body}>Downloading STT Model...</Text>
+          <Text style={{ ...theme.typography.body, color: theme.colors.textSecondary }}>
+            Preparing models...
+          </Text>
         </View>
       ) : (
         <View style={styles.body}>
+          <TranscriptTicker />
           <IntakeForm />
           <CompletionBar onGeneratePlan={handleGeneratePlan} />
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  root: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  body: {
-    flex: 1,
+  headerSafe: {
+    backgroundColor: theme.colors.headerBg,
   },
   header: {
-    padding: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  brandName: {
+    fontSize: 22,
+    fontWeight: "800",
+    letterSpacing: 3,
+    color: theme.colors.headerText,
+  },
+  brandSub: {
+    fontSize: 11,
+    fontWeight: "500",
+    letterSpacing: 0.5,
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 1,
+  },
+  body: {
+    flex: 1,
   },
   loading: {
     flex: 1,
@@ -228,26 +257,35 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   scanButton: {
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radii.md,
-    backgroundColor: theme.colors.surface,
+    paddingVertical: 6,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.radii.sm,
+    backgroundColor: "rgba(255,255,255,0.15)",
     borderWidth: 1,
-    borderColor: theme.colors.fieldEmptyBorder,
+    borderColor: "rgba(255,255,255,0.25)",
   },
   scanButtonText: {
     ...theme.typography.caption,
-    color: theme.colors.textPrimary,
+    color: theme.colors.headerText,
     fontWeight: "600",
+    fontSize: 12,
   },
   micButton: {
-    paddingVertical: theme.spacing.xs,
+    paddingVertical: 7,
     paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radii.md,
+    borderRadius: theme.radii.full,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.4)",
+  },
+  micButtonActive: {
+    backgroundColor: theme.colors.danger,
+    borderColor: theme.colors.danger,
   },
   micButtonText: {
-    ...theme.typography.caption,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
     color: "#FFFFFF",
-    fontWeight: "600",
   },
 });

@@ -18,6 +18,7 @@ import {
   PhotoFile,
 } from "react-native-vision-camera";
 import RNFS from "react-native-fs";
+import { launchImageLibrary } from "react-native-image-picker";
 
 import { theme } from "../theme";
 import { useAppStore } from "../store/useAppStore";
@@ -181,6 +182,50 @@ export function DocumentScanScreen() {
     }
   }, [cleanupFile, intake, tempPath]);
 
+  const handlePickFromLibrary = useCallback(async () => {
+    setError(null);
+    let workingPath: string | null = null;
+
+    try {
+      const result = await launchImageLibrary({
+        mediaType: "photo",
+        selectionLimit: 1,
+      });
+
+      if (result.didCancel || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+      if (!asset.uri) throw new Error("No image URI returned");
+
+      const srcPath = asset.uri.replace("file://", "");
+      const destPath = `${RNFS.TemporaryDirectoryPath}/scan_${Date.now()}.jpg`;
+      await RNFS.copyFile(srcPath, destPath);
+
+      workingPath = destPath;
+      setTempPath(destPath);
+      setPhase("processing");
+
+      const engine = engineRef.current;
+      if (!engine) throw new Error("Extraction engine not ready");
+
+      const result2 = await engine.extractFromImage(destPath, intake);
+
+      await cleanupFile(destPath);
+      workingPath = null;
+      setTempPath(null);
+
+      setDelta(result2 ?? {});
+      setPhase("preview");
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      setError(msg);
+      if (workingPath) await cleanupFile(workingPath);
+      setTempPath(null);
+      setPhase("camera");
+      Alert.alert("Pick failed", msg);
+    }
+  }, [cleanupFile, intake]);
+
   const handleAccept = useCallback(
     (selected: IntakeDelta) => {
       if (selected && Object.keys(selected).length > 0) {
@@ -232,7 +277,7 @@ export function DocumentScanScreen() {
       <SafeAreaView style={styles.guard}>
         <Text style={styles.guardTitle}>Camera permission required</Text>
         <Text style={styles.guardBody}>
-          CrisisIntake needs camera access to scan documents. Images are held
+          Oasis needs camera access to scan documents. Images are held
           in memory only and deleted immediately after extraction.
         </Text>
         <Pressable onPress={requestPermission} style={styles.guardButton}>
@@ -249,8 +294,14 @@ export function DocumentScanScreen() {
     return (
       <SafeAreaView style={styles.guard}>
         <Text style={styles.guardTitle}>No camera available</Text>
-        <Pressable onPress={handleCancel} style={styles.guardButton}>
-          <Text style={styles.guardButtonText}>Back</Text>
+        <Text style={styles.guardBody}>
+          Pick a document image from your photo library instead.
+        </Text>
+        <Pressable onPress={handlePickFromLibrary} style={styles.guardButton}>
+          <Text style={styles.guardButtonText}>Pick from Library</Text>
+        </Pressable>
+        <Pressable onPress={handleCancel} style={styles.guardLink}>
+          <Text style={styles.guardLinkText}>Back</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -372,11 +423,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
   processingImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     opacity: 0.6,
   },
   processingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     gap: theme.spacing.md,

@@ -38,20 +38,14 @@ export function RecordingIndicator() {
             styles.dot,
             { opacity: pulseAnim }
           ]} />
-          <Text style={styles.text}>
-            Listening...
-          </Text>
+          <Text style={styles.text}>Listening</Text>
         </>
       )}
       {phase === "transcribing" && (
-        <Text style={[styles.text, { color: theme.colors.accent }]}>
-          Transcribing...
-        </Text>
+        <Text style={[styles.text, styles.textActive]}>Transcribing</Text>
       )}
       {phase === "extracting" && (
-        <Text style={[styles.text, { color: theme.colors.fieldInferredBorder }]}>
-          Extracting fields...
-        </Text>
+        <Text style={[styles.text, { color: "#FCD34D" }]}>Extracting</Text>
       )}
     </View>
   );
@@ -61,20 +55,25 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.radii.md,
-    ...theme.shadows.card,
+    paddingVertical: 4,
+    paddingHorizontal: theme.spacing.sm,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: theme.radii.full,
   },
   dot: {
-    width: 10,
-    height: 10,
+    width: 8,
+    height: 8,
     borderRadius: theme.radii.full,
-    backgroundColor: theme.colors.danger,
-    marginRight: theme.spacing.sm,
+    backgroundColor: "#FF6B6B",
+    marginRight: 6,
   },
   text: {
-    ...theme.typography.caption,
-    color: theme.colors.textSecondary,
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+    color: "rgba(255,255,255,0.8)",
+  },
+  textActive: {
+    color: "#FFFFFF",
   },
 });

@@ -2,6 +2,8 @@ import { CactusLM } from "cactus-react-native";
 // @ts-ignore - accessing internal CactusFileSystem for direct download
 import { CactusFileSystem } from "cactus-react-native/lib/module/native/index.js";
 import { IntakeSchema } from "../types/intake";
+
+export type IntakeDelta = Partial<Record<keyof IntakeSchema, any>>;
 import { updateIntakeFieldsTool } from "./toolSchema";
 import { parseExtractionResult } from "./parseToolCall";
 

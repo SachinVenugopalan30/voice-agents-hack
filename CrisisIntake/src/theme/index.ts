@@ -1,26 +1,36 @@
 export const theme = {
   colors: {
-    fieldEmpty: "#F3F4F6",
-    fieldEmptyBorder: "#E5E7EB",
-    fieldInferred: "#FFFBEB",
-    fieldInferredBorder: "#F59E0B",
-    fieldInferredAccent: "#D97706",
-    fieldConfirmed: "#ECFDF5",
-    fieldConfirmedBorder: "#10B981",
-    fieldConfirmedAccent: "#059669",
+    // Field states — the core visual language
+    fieldEmpty: "#F5F0E8",
+    fieldEmptyBorder: "#DDD5C8",
+    fieldInferred: "#FFF7E0",
+    fieldInferredBorder: "#E8A817",
+    fieldInferredAccent: "#C48A00",
+    fieldConfirmed: "#E6F7ED",
+    fieldConfirmedBorder: "#1FAD5F",
+    fieldConfirmedAccent: "#0D8A45",
 
-    background: "#FFFFFF",
-    surface: "#F9FAFB",
-    textPrimary: "#111827",
-    textSecondary: "#6B7280",
-    textMuted: "#9CA3AF",
-    accent: "#3B82F6",
-    danger: "#EF4444",
-    dangerLight: "#FEE2E2",
+    // Canvas
+    background: "#FAF7F2",
+    surface: "#F0EBE3",
+    textPrimary: "#1A1612",
+    textSecondary: "#5C524A",
+    textMuted: "#9B8E82",
 
-    riskLow: "#10B981",
-    riskMedium: "#F59E0B",
-    riskHigh: "#EF4444",
+    // Accent — deep teal (the "oasis" water)
+    accent: "#0E7C6B",
+    accentLight: "#E0F5F0",
+    danger: "#D44332",
+    dangerLight: "#FDEAE7",
+
+    // Risk badges
+    riskLow: "#1FAD5F",
+    riskMedium: "#E8A817",
+    riskHigh: "#D44332",
+
+    // Header
+    headerBg: "#0E7C6B",
+    headerText: "#FFFFFF",
   },
 
   spacing: {
@@ -41,31 +51,38 @@ export const theme = {
   },
 
   typography: {
-    h1: { fontSize: 28, fontWeight: "700" as const, letterSpacing: -0.5 },
-    h2: { fontSize: 22, fontWeight: "600" as const, letterSpacing: -0.3 },
+    h1: { fontSize: 30, fontWeight: "800" as const, letterSpacing: -0.8 },
+    h2: { fontSize: 24, fontWeight: "700" as const, letterSpacing: -0.4 },
     h3: { fontSize: 17, fontWeight: "600" as const },
-    body: { fontSize: 15, fontWeight: "400" as const },
-    caption: { fontSize: 13, fontWeight: "500" as const, letterSpacing: 0.5 },
+    body: { fontSize: 15, fontWeight: "400" as const, lineHeight: 22 },
+    caption: { fontSize: 13, fontWeight: "500" as const, letterSpacing: 0.3 },
     sectionHeader: {
-      fontSize: 12,
-      fontWeight: "600" as const,
-      letterSpacing: 1,
+      fontSize: 11,
+      fontWeight: "700" as const,
+      letterSpacing: 1.5,
       textTransform: "uppercase" as const,
     },
   },
 
   shadows: {
     card: {
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 3,
+      shadowColor: "#1A1612",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 6,
       elevation: 2,
     },
     elevated: {
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
+      shadowColor: "#1A1612",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      elevation: 6,
+    },
+    glow: {
+      shadowColor: "#E8A817",
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.3,
       shadowRadius: 12,
       elevation: 4,
     },

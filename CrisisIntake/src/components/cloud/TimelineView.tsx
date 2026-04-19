@@ -70,25 +70,34 @@ export function TimelineView({ entries }: TimelineViewProps) {
         return (
           <View key={`${entry.day}-${idx}`} style={styles.row}>
             <View style={styles.markerColumn}>
-              <View style={styles.marker}>
-                <Text style={styles.markerText}>{entry.day}</Text>
+              <View style={styles.markerHalo}>
+                <View style={styles.marker}>
+                  <Text style={styles.markerText}>{entry.day}</Text>
+                </View>
               </View>
               {!isLast && <View style={styles.connector} />}
             </View>
 
-            <View style={styles.body}>
-              <Text style={styles.dayLabel}>Day {entry.day}</Text>
-              <Text style={styles.action}>{entry.action}</Text>
-              <View
-                style={[
-                  styles.categoryChip,
-                  { backgroundColor: cat.background, borderColor: cat.border },
-                ]}
-              >
-                <Text style={[styles.categoryText, { color: cat.text }]}>
-                  {cat.label}
-                </Text>
+            <View style={styles.bodyCard}>
+              <View style={styles.headerRow}>
+                <View>
+                  <Text style={styles.dayLabel}>Day {entry.day}</Text>
+                  <Text style={styles.sequenceLabel}>
+                    {idx === 0 ? "Immediate action" : `Step ${idx + 1}`}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.categoryChip,
+                    { backgroundColor: cat.background, borderColor: cat.border },
+                  ]}
+                >
+                  <Text style={[styles.categoryText, { color: cat.text }]}>
+                    {cat.label}
+                  </Text>
+                </View>
               </View>
+              <Text style={styles.action}>{entry.action}</Text>
             </View>
           </View>
         );
@@ -97,11 +106,11 @@ export function TimelineView({ entries }: TimelineViewProps) {
   );
 }
 
-const MARKER_SIZE = 32;
+const MARKER_SIZE = 34;
 
 const styles = StyleSheet.create({
   container: {
-    gap: 0,
+    gap: theme.spacing.sm,
   },
   row: {
     flexDirection: "row",
@@ -110,7 +119,15 @@ const styles = StyleSheet.create({
   },
   markerColumn: {
     alignItems: "center",
-    width: MARKER_SIZE,
+    width: MARKER_SIZE + 8,
+  },
+  markerHalo: {
+    width: MARKER_SIZE + 8,
+    height: MARKER_SIZE + 8,
+    borderRadius: (MARKER_SIZE + 8) / 2,
+    backgroundColor: theme.colors.accentLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   marker: {
     width: MARKER_SIZE,
@@ -119,42 +136,62 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.accent,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.24)",
     ...theme.shadows.card,
   },
   markerText: {
     color: theme.colors.background,
-    fontWeight: "700",
+    fontWeight: "800",
     fontSize: 13,
   },
   connector: {
     flex: 1,
-    width: 2,
-    backgroundColor: theme.colors.fieldEmptyBorder,
-    marginTop: 2,
-    marginBottom: 2,
+    width: 3,
+    backgroundColor: theme.colors.accentLight,
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
+    borderRadius: theme.radii.full,
   },
-  body: {
+  bodyCard: {
     flex: 1,
+    backgroundColor: "#FFFCF8",
+    borderRadius: theme.radii.lg,
+    borderWidth: 1,
+    borderColor: "#E5DDD1",
+    padding: theme.spacing.md,
     paddingBottom: theme.spacing.lg,
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
+    ...theme.shadows.card,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: theme.spacing.sm,
   },
   dayLabel: {
     ...theme.typography.caption,
-    color: theme.colors.textSecondary,
+    color: theme.colors.accent,
     textTransform: "uppercase",
+    letterSpacing: 0.7,
+  },
+  sequenceLabel: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+    marginTop: 2,
   },
   action: {
     ...theme.typography.body,
     color: theme.colors.textPrimary,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   categoryChip: {
     alignSelf: "flex-start",
-    paddingVertical: 4,
+    paddingVertical: 5,
     paddingHorizontal: theme.spacing.sm,
-    borderRadius: theme.radii.sm,
+    borderRadius: theme.radii.full,
     borderWidth: 1,
-    marginTop: theme.spacing.xs,
   },
   categoryText: {
     ...theme.typography.caption,
